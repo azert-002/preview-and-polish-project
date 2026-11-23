@@ -85,6 +85,8 @@ export function GroupDialog({
   const [f, setF] = useState(empty);
   const [nameManuallyEdited, setNameManuallyEdited] = useState(false);
   const [showLockedHint, setShowLockedHint] = useState(false);
+  // While editing, the name is regenerated only after the user changes a field it is built from.
+  const [namingFieldsChanged, setNamingFieldsChanged] = useState(false);
   const isCohort = Boolean(preset && !group);
   const isAdding = !group && !isCohort;
   const hasRequiredForAuto =
@@ -148,6 +150,7 @@ export function GroupDialog({
     if (!open) return;
     setNameManuallyEdited(false);
     setShowLockedHint(false);
+    setNamingFieldsChanged(false);
     const initialAct = activityOptions[0] || "levels";
     if (group) {
       setF({
@@ -200,13 +203,22 @@ export function GroupDialog({
     }
   }, [open, activityOptions, f.activity]);
 
-  // Auto-generate group name when adding a group if required fields are filled and user hasn't manually edited the name
+  // Adult level groups always have a level: preselect the first one (cheapest, e.g. A0) instead of an empty choice
   useEffect(() => {
-    if (!open || !isAdding) return;
+    if (!open || f.activity !== "levels" || f.age_group !== "17+" || f.level_id) return;
+    const first = levels[0];
+    if (first) setF((prev) => ({ ...prev, level_id: first.id }));
+  }, [open, f.activity, f.age_group, f.level_id, levels]);
+
+  // Auto-generate the group name: always while adding, and while editing once subject/age/level/activity changed,
+  // unless the user typed a name of their own
+  const autoNaming = isAdding || Boolean(group && namingFieldsChanged);
+  useEffect(() => {
+    if (!open || !autoNaming) return;
     if (nameManuallyEdited && f.name.trim() !== "") return;
 
     if (!hasRequiredForAuto) {
-      if (!nameManuallyEdited && f.name !== "") {
+      if (isAdding && !nameManuallyEdited && f.name !== "") {
         setF((prev) => ({ ...prev, name: "" }));
       }
       return;
@@ -222,7 +234,7 @@ export function GroupDialog({
       ageGroup: f.age_group,
       levelCode: lvlCode ?? null,
       activity: f.activity,
-      existingNames: groups.map((g) => g.name), // only runs while adding, so there is no current group to exclude
+      existingNames: groups.filter((g) => g.id !== group?.id).map((g) => g.name),
     });
 
     if (autoName && f.name !== autoName) {
@@ -231,6 +243,7 @@ export function GroupDialog({
     }
   }, [
     open,
+    autoNaming,
     isAdding,
     hasRequiredForAuto,
     nameManuallyEdited,
@@ -248,6 +261,7 @@ export function GroupDialog({
 
   const set = (k: keyof typeof f) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const val = e.target.value;
+    if (k === "subject_id" || k === "age_group" || k === "level_id") setNamingFieldsChanged(true);
     if (k === "activity" && val === "workshop") {
       setF({
         ...f,
@@ -445,6 +459,7 @@ export function GroupDialog({
                 value={f.activity}
                 onChange={(e) => {
                   const a = e.target.value;
+                  setNamingFieldsChanged(true);
                   const matching = subjects.filter((s) => subjectHasActivity(s, a));
                   const stillValid = matching.some((s) => s.id === f.subject_id);
                   setF({
@@ -531,7 +546,6 @@ export function GroupDialog({
           {!isCohort && f.activity === "levels" && f.age_group === "17+" && (
             <Field label={t("level")}>
               <select className={selectCls} value={f.level_id} onChange={set("level_id")} required>
-                <option value="">—</option>
                 {levels.map((l) => (
                   <option key={l.id} value={l.id}>
                     {l.code} · {money(l.price)} / {t("monthlyPlan")}

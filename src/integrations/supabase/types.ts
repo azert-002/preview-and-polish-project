@@ -95,6 +95,7 @@ export type Database = {
           sessions_total: number
           sessions_used: number
           student_id: string
+          withdrawn_at: string | null
         }
         Insert: {
           created_at?: string
@@ -106,6 +107,7 @@ export type Database = {
           sessions_total?: number
           sessions_used?: number
           student_id: string
+          withdrawn_at?: string | null
         }
         Update: {
           created_at?: string
@@ -117,6 +119,7 @@ export type Database = {
           sessions_total?: number
           sessions_used?: number
           student_id?: string
+          withdrawn_at?: string | null
         }
         Relationships: [
           {

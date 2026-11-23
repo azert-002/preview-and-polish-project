@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useQueryClient } from "@tanstack/react-query";
-import { AlertTriangle, ArrowLeft, CreditCard, Hourglass, Info as InfoIcon, Ban, Pencil, PlusCircle, Printer, Trash2, Phone, Wallet } from "lucide-react";
+import { AlertTriangle, ArrowLeft, CreditCard, Hourglass, Info as InfoIcon, Ban, Pencil, PlusCircle, Printer, Trash2, Phone, Wallet, UserMinus } from "lucide-react";
 import { toast } from "sonner";
 import { notifyError } from "@/lib/errors";
 import { confirmAction } from "@/lib/confirm";
@@ -27,6 +27,7 @@ import { Empty, Field, PageHeader, Panel, Pill, SessionBar, selectCls } from "@/
 import { StudentForm } from "@/components/StudentForm";
 import { PaymentReceipt, PrintDialog, StudentCard } from "@/components/print";
 import { PayDebtDialog, type ReceiptData } from "@/components/PayDebtDialog";
+import { WithdrawDialog } from "@/components/WithdrawDialog";
 
 export const Route = createFileRoute("/_authenticated/students/$id")({
   head: () => ({ meta: [
@@ -58,6 +59,7 @@ function StudentPage() {
   const [receipt, setReceipt] = useState<Omit<ReceiptData, "student"> | null>(null);
   const [payOpen, setPayOpen] = useState(false);
   const [payKey, setPayKey] = useState<string | null>(null);
+  const [withdrawKey, setWithdrawKey] = useState<string | null>(null);
 
   const mine = useMemo(() => enrollments.filter((e) => e && e.student_id === id), [enrollments, id]);
   const myPayments = useMemo(() => payments.filter((p) => p && p.student_id === id), [payments, id]);
@@ -197,6 +199,8 @@ function StudentPage() {
                   const used = b.enrollments.reduce((a, x) => a + x.sessions_used, 0);
                   const total = b.enrollments.reduce((a, x) => a + x.sessions_total, 0);
                   const paidPart = b.price - b.remaining;
+                  const withdrawnAt = b.enrollments.find((x) => x.withdrawn_at)?.withdrawn_at ?? null;
+                  const canWithdraw = !withdrawnAt && used < total && !b.enrollments.every((x) => x.payout_id);
                   return (
                     <li key={b.key} className="space-y-2 py-3">
                       <div className="flex flex-wrap items-center justify-between gap-3">
@@ -208,12 +212,26 @@ function StudentPage() {
                         </div>
                         <div className="flex items-center gap-3">
                           <SessionBar used={used} total={total} />
-                          {b.enrollments.every((x) => x.payout_id) ? (
+                          {withdrawnAt ? (
+                            <Pill tone="danger" title={`${t("withdrawnOn")} ${fmtDate(withdrawnAt)}`}>
+                              {t("withdrawn")} · {fmtDate(withdrawnAt)}
+                            </Pill>
+                          ) : b.enrollments.every((x) => x.payout_id) ? (
                             <Pill>{t("paidOut")}</Pill>
                           ) : used >= total ? (
                             <Pill tone="warning">{t("completed")}</Pill>
                           ) : (
                             <Pill tone="success">{t("active")}</Pill>
+                          )}
+                          {canWithdraw && (
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              className="h-7 text-destructive hover:bg-destructive/10 hover:text-destructive"
+                              onClick={() => setWithdrawKey(b.key)}
+                            >
+                              <UserMinus /> {t("withdraw")}
+                            </Button>
                           )}
                         </div>
                       </div>
@@ -343,6 +361,19 @@ function StudentPage() {
           setEnrollOpen(false);
           qc.invalidateQueries();
           if (r) setReceipt(r);
+        }}
+      />
+
+      <WithdrawDialog
+        open={withdrawKey !== null}
+        onOpenChange={(o) => !o && setWithdrawKey(null)}
+        student={student}
+        bundle={ledger.bundles.find((b) => b.key === withdrawKey) ?? null}
+        enrollments={mine}
+        payments={myPayments}
+        onDone={() => {
+          setWithdrawKey(null);
+          qc.invalidateQueries();
         }}
       />
 

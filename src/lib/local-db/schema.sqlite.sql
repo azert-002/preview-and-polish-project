@@ -146,6 +146,7 @@ CREATE TABLE IF NOT EXISTS enrollments (
   sessions_total INTEGER NOT NULL DEFAULT 8,
   sessions_used INTEGER NOT NULL DEFAULT 0,
   payout_id TEXT REFERENCES payouts(id) ON DELETE SET NULL,
+  withdrawn_at TEXT,
   created_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
 

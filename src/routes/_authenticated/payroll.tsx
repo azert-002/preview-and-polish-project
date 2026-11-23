@@ -91,8 +91,10 @@ function Payroll() {
   // - Daily workshop: 1 session completed and not paid yet
   // - Support / Languages / Levels: teacher receives fixed 500 DZD per student each month
   //   as long as the package still has months to pay (timesPaid < maxMonths)
+  // a package the student left before any session was taught never earns the teacher anything
+  const neverTaught = (e: (typeof mine)[number]) => Boolean(e.withdrawn_at) && e.sessions_used === 0;
   const isEligible = (e: (typeof mine)[number]) => {
-    if (e.payout_id) return false;
+    if (e.payout_id || neverTaught(e)) return false;
     const maxM = maxMonthsOf(e);
     const times = timesPaidOf(e.id);
     if (times >= maxM) return false;
@@ -104,7 +106,7 @@ function Payroll() {
   };
 
   const eligible = mine.filter(isEligible);
-  const deferred = mine.filter((e) => !e.payout_id && !isEligible(e));
+  const deferred = mine.filter((e) => !e.payout_id && !neverTaught(e) && !isEligible(e));
 
   const revenue = eligible.reduce((s, e) => s + Math.round(Number(e.price) / maxMonthsOf(e)), 0);
   const share = eligible.reduce((s, e) => s + amountOf(e), 0);

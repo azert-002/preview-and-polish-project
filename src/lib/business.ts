@@ -146,9 +146,12 @@ export function remainingSessions(e: { sessions_used?: number | null; sessions_t
  */
 export function groupStudentIds(
   activity: string | null | undefined,
-  enrollments: { student_id: string; sessions_used: number; sessions_total: number }[],
+  enrollments: { student_id: string; sessions_used: number; sessions_total: number; withdrawn_at?: string | null }[],
 ) {
-  const list = activity === "workshop" ? enrollments : enrollments.filter((e) => remainingSessions(e) > 0);
+  const list =
+    activity === "workshop"
+      ? enrollments.filter((e) => !e.withdrawn_at)
+      : enrollments.filter((e) => remainingSessions(e) > 0);
   return new Set(list.map((e) => e.student_id));
 }
 
@@ -359,7 +362,7 @@ export function audienceForAgeGroup(g: string | null | undefined): Audience {
  */
 export function groupSeat(
   activity: string | null | undefined,
-  groupEnrollments: { student_id: string; sessions_used: number; sessions_total: number }[],
+  groupEnrollments: { student_id: string; sessions_used: number; sessions_total: number; withdrawn_at?: string | null }[],
   studentId: string,
 ) {
   const ids = groupStudentIds(activity, groupEnrollments);
@@ -444,3 +447,65 @@ export function buildAutoGroupName({
   return `${base} (${counter})`;
 }
 
+
+// ---------------------------------------------------------------------------
+// Withdrawing a student from a package
+// ---------------------------------------------------------------------------
+
+/** "used": charge only the sessions already consumed; "full": keep the whole package price (no refund). */
+export type WithdrawMode = "used" | "full";
+
+export interface WithdrawBlock {
+  id: string;
+  sessions_used: number;
+  sessions_total: number;
+  price: number | string;
+  payout_id: string | null;
+}
+
+export interface WithdrawalPlan {
+  /** Blocks that stay, with their new session count and price (every kept block gets marked withdrawn). */
+  keep: { id: string; sessions_total: number; price: number }[];
+  /** Blocks never started: removed entirely. */
+  deletes: string[];
+  /** Block that payments of removed blocks move to. */
+  keepId: string | null;
+  oldPrice: number;
+  newPrice: number;
+}
+
+/**
+ * Ends a package now: the student keeps the sessions already consumed and loses the rest,
+ * so their seat in the group is freed. Paid-out or finished blocks are never changed.
+ */
+export function planWithdrawal(blocks: WithdrawBlock[], mode: WithdrawMode): WithdrawalPlan {
+  const keep: WithdrawalPlan["keep"] = [];
+  const deletes: string[] = [];
+  let removedPrice = 0;
+  const oldPrice = Math.round(blocks.reduce((s, b) => s + Number(b.price ?? 0), 0) * 100) / 100;
+
+  for (const b of blocks) {
+    const price = Number(b.price ?? 0);
+    const total = Number(b.sessions_total ?? 0);
+    const used = Math.min(Number(b.sessions_used ?? 0), total);
+    if (b.payout_id || used >= total) {
+      keep.push({ id: b.id, sessions_total: total, price });
+    } else if (used === 0) {
+      deletes.push(b.id);
+      removedPrice += price;
+    } else {
+      keep.push({ id: b.id, sessions_total: used, price: mode === "used" ? Math.round((price * used) / total) : price });
+    }
+  }
+
+  if (keep.length === 0 && deletes.length > 0) {
+    // nothing was consumed: keep one empty block so the package stays in the history as withdrawn
+    keep.push({ id: deletes.shift()!, sessions_total: 0, price: mode === "full" ? removedPrice : 0 });
+  } else if (mode === "full" && removedPrice > 0) {
+    const target = [...keep].reverse().find((k) => !blocks.find((b) => b.id === k.id)?.payout_id) ?? keep[keep.length - 1];
+    if (target) target.price += removedPrice;
+  }
+
+  const newPrice = Math.round(keep.reduce((s, k) => s + k.price, 0) * 100) / 100;
+  return { keep, deletes, keepId: keep[0]?.id ?? null, oldPrice, newPrice };
+}
