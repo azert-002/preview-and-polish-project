@@ -106,6 +106,8 @@ function StudentsPage() {
                       <td className="py-2.5 text-center">
                         {mine.length === 0 ? (
                           <Pill>{t("noActivePackage")}</Pill>
+                        ) : left <= 0 && mine.every((e) => e.withdrawn_at) ? (
+                          <Pill>{t("withdrawn")}</Pill>
                         ) : (
                           <Pill tone={left <= 0 ? "danger" : left <= 1 ? "warning" : "success"}>{left}</Pill>
                         )}

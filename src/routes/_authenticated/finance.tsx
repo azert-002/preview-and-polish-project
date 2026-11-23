@@ -64,9 +64,10 @@ function Finance() {
     .map((s) => {
       const a = accounts.get(s.id)!;
       const left = a.mine.reduce((x, e) => x + remainingSessions(e), 0);
-      return { s, outstanding: a.ledger.debt, left, has: a.mine.length > 0 };
+      const withdrawn = a.mine.length > 0 && a.mine.every((e) => e.withdrawn_at);
+      return { s, outstanding: a.ledger.debt, left, has: a.mine.length > 0, withdrawn };
     })
-    .filter((d) => d.has && (d.outstanding > 0 || d.left <= 0))
+    .filter((d) => d.has && (d.outstanding > 0 || (d.left <= 0 && !d.withdrawn)))
     .sort((a, b) => b.outstanding - a.outstanding);
   const totalDebt = debts.reduce((x, d) => x + d.outstanding, 0);
 

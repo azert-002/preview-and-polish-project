@@ -44,6 +44,13 @@ export function StudentForm({
   const set = (k: keyof typeof f) => (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) =>
     setF({ ...f, [k]: e.target.value });
 
+  // Adult level choice always has a level: preselect the first one (e.g. A0) instead of an empty choice
+  useEffect(() => {
+    if (f.age_group !== "17+" || f.activity !== "levels" || f.level_id) return;
+    const first = levels[0];
+    if (first) setF((prev) => ({ ...prev, level_id: first.id }));
+  }, [f.age_group, f.activity, f.level_id, levels]);
+
   // Sync initial student info and fetch registration / waitlist / enrollment details when editing
   useEffect(() => {
     if (!initial) {
@@ -348,7 +355,6 @@ export function StudentForm({
                 onChange={(e) => setF({ ...f, level_id: e.target.value })}
                 required
               >
-                <option value="">— {t("pickLevel")} —</option>
                 {levels.map((l) => (
                   <option key={l.id} value={l.id}>
                     {l.code}

@@ -59,7 +59,7 @@ function GroupAttendance() {
     const left = list.reduce((s, e) => s + remainingSessions(e), 0);
     const today = attendance.find((a) => a.student_id === sid && a.group_id === id && isToday(a.created_at)) ?? null;
     return { sid, student: list[0]!.student, active, left, today, last: list[list.length - 1]! };
-  });
+  }).filter((r) => r.active || r.today || !r.last.withdrawn_at); // removed from the package: seat freed, not listed
 
   async function mark(sid: string, enrollmentId: string, status: "present" | "absent") {
     const { error } = await supabase.from("attendance").insert({ enrollment_id: enrollmentId, student_id: sid, group_id: id, status });

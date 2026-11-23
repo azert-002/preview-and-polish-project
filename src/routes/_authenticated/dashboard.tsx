@@ -42,7 +42,8 @@ function Dashboard() {
       const left = list.reduce((s, e) => s + remainingSessions(e), 0);
       return { e: list[list.length - 1]!, left };
     })
-    .filter((x) => x.left <= 1 && x.e.group?.activity !== "workshop")
+    // a student removed from the package left on purpose: no renewal alert
+    .filter((x) => x.left <= 1 && x.e.group?.activity !== "workshop" && !(x.left === 0 && x.e.withdrawn_at))
     .slice(0, 12);
 
   const todays = attendance.filter((a) => isToday(a.created_at));

@@ -64,6 +64,13 @@ export function WaitlistDialog({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open]);
 
+  // Adult level choice always has a level: preselect the first one (e.g. A0) instead of an empty choice
+  useEffect(() => {
+    if (!open || activity !== "levels" || ageGroup !== "17+" || levelId) return;
+    const first = levels[0];
+    if (first) setLevelId(first.id);
+  }, [open, activity, ageGroup, levelId, levels]);
+
   const results = useMemo(() => (student ? [] : searchStudents(students, q)), [students, q, student]);
 
   function choose(s: Student) {
@@ -221,7 +228,6 @@ export function WaitlistDialog({
             {activity === "levels" && ageGroup === "17+" && (
               <Field label={t("level")} className="sm:col-span-2">
                 <select className={selectCls} value={levelId} onChange={(e) => setLevelId(e.target.value)} required>
-                  <option value="">— {t("pickLevel")} —</option>
                   {levels.map((l) => (
                     <option key={l.id} value={l.id}>
                       {l.code}
