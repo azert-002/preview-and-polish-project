@@ -159,13 +159,18 @@ function ScanStation() {
     }
   }
 
+  // Ref guard (state updates are async): a fast double scan must not check in twice.
+  const running = useRef(false);
   async function run(fn: () => Promise<void>) {
+    if (running.current) return;
+    running.current = true;
     setQuery("");
     setActive(-1);
     setBusy(true);
     try {
       await fn();
     } finally {
+      running.current = false;
       setBusy(false);
       inputRef.current?.focus();
     }
@@ -432,7 +437,7 @@ function ScanStation() {
                     <p className="mb-2 text-sm text-foreground">{t("chooseGroup")}</p>
                     <div className="flex flex-wrap gap-2">
                       {result.options.map((o) => (
-                        <Button key={o.id} variant="outline" onClick={() => mark(result.student, o, result.options)}>
+                        <Button key={o.id} variant="outline" onClick={() => run(() => mark(result.student, o, result.options))}>
                           {groupLabel(o.group, pick)}
                         </Button>
                       ))}

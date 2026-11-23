@@ -450,6 +450,19 @@ const dict = {
   withdrawSeatNote: { ar: "سيُحرَّر مكان الطالب في الفوج فوراً، ويبقى سجل حضوره ومدفوعاته محفوظاً.", en: "The student's seat in the group is freed now; attendance and payment history are kept." },
   withdrawConfirm: { ar: "تأكيد الإزالة", en: "Confirm removal" },
   withdrawDone: { ar: "أُزيل الطالب من الباقة", en: "Student removed from the package" },
+  // duplicates & field checks
+  vNameLetters: { ar: "الاسم واللقب يجب أن يحتويا على حروف، وليس أرقاماً فقط.", en: "First and last name must contain letters, not only digits." },
+  vPhone: { ar: "رقم الهاتف غير صحيح: أرقام فقط، من 9 إلى 13 رقماً.", en: "Invalid phone number: digits only, 9 to 13 digits." },
+  dupStudentTitle: { ar: "الطالب مسجّل مسبقاً", en: "Student already registered" },
+  dupStudentMsg: { ar: "«{name}» مسجّل مسبقاً برمز {code}. افتح ملفه بدل إضافته مرة ثانية. إن كان طالباً آخر بنفس الاسم أضف رقم هاتفه لتمييزه.", en: "“{name}” is already registered as {code}. Open their file instead of adding them again. If this is another student with the same name, add their phone number." },
+  dupStudentPossibleTitle: { ar: "يوجد طالب بنفس الاسم", en: "A student with the same name exists" },
+  dupStudentPossibleMsg: { ar: "«{name}» مسجّل مسبقاً برمز {code} وبرقم هاتف مختلف. هل هذا طالب آخر فعلاً؟", en: "“{name}” is already registered as {code} with a different phone. Is this really another student?" },
+  dupStudentPossibleOk: { ar: "نعم، طالب آخر", en: "Yes, another student" },
+  dupTeacher: { ar: "هذا الأستاذ مسجّل مسبقاً برمز {code}.", en: "This teacher is already registered as {code}." },
+  dupSubject: { ar: "هذه المادة موجودة مسبقاً: {name}.", en: "This subject already exists: {name}." },
+  dupRoom: { ar: "هذه القاعة موجودة مسبقاً: {name}.", en: "This room already exists: {name}." },
+  dupLevel: { ar: "هذا المستوى موجود مسبقاً: {name}.", en: "This level already exists: {name}." },
+  dupTitle: { ar: "موجود مسبقاً", en: "Already exists" },
 } as const;
 
 export type TKey = keyof typeof dict;

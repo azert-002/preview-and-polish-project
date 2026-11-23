@@ -13,6 +13,7 @@ import { useEnrollments, useGroups, useLevels, useRooms, useSettings, useSubject
 import { AGE_GROUPS, GROUP_CAPACITY, WAITLIST_READY, audienceForAgeGroup, buildAutoGroupName, groupSeat, groupStudentIds, waitlistBuckets } from "@/lib/business";
 import { ageGroupKey, subjectName } from "@/lib/labels";
 import { findGroupConflicts } from "@/lib/schedule";
+import { findDuplicateLabel, findDuplicateTeacher, hasLetters, isValidPhone } from "@/lib/duplicates";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { GroupDialog, type GroupPreset } from "@/components/GroupDialog";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -429,7 +430,9 @@ function SubjectsTab() {
 
   async function add(e: React.FormEvent) {
     e.preventDefault();
-    const row = { ...f, activities: acts };
+    const row = { name_ar: f.name_ar.trim(), name_en: f.name_en.trim(), activities: acts };
+    const clash = findDuplicateLabel({ id: editId, labels: [row.name_ar, row.name_en] }, subjects, (x) => [x.name_ar, x.name_en]);
+    if (clash) { toast.error(t("dupTitle"), { id: "duplicate", description: t("dupSubject").replace("{name}", clash.name_ar) }); return; }
     const { error } = editId
       ? await supabase.from("subjects").update(row).eq("id", editId)
       : await supabase.from("subjects").insert(row);
@@ -514,7 +517,9 @@ function RoomsTab() {
 
   async function add(e: React.FormEvent) {
     e.preventDefault();
-    const row = { ...f, capacity: Number(f.capacity) || 15, notes: f.notes || null };
+    const row = { ...f, name_ar: f.name_ar.trim(), name_en: f.name_en.trim(), capacity: Number(f.capacity) || 15, notes: f.notes.trim() || null };
+    const clash = findDuplicateLabel({ id: editId, labels: [row.name_ar, row.name_en] }, rooms, (x) => [x.name_ar, x.name_en]);
+    if (clash) { toast.error(t("dupTitle"), { id: "duplicate", description: t("dupRoom").replace("{name}", clash.name_ar) }); return; }
     const { error } = editId
       ? await supabase.from("rooms").update(row).eq("id", editId)
       : await supabase.from("rooms").insert(row);
@@ -602,10 +607,16 @@ function TeachersTab() {
       last_name: f.last_name.trim(),
       first_name: f.first_name.trim(),
       full_name: `${f.last_name.trim()} ${f.first_name.trim()}`,
-      phone: f.phone || null,
+      phone: f.phone.trim() || null,
       gender: f.gender,
       percentage: Number(f.amount || 500),
     };
+    const warn = (msg: string) => toast.warning(t("vTitle"), { id: "form-validation", description: msg });
+    if (!row.first_name || !row.last_name) { warn(t("vRequired").replace("{label}", !row.last_name ? t("lastName") : t("firstName"))); return; }
+    if (!hasLetters(row.first_name) || !hasLetters(row.last_name)) { warn(t("vNameLetters")); return; }
+    if (!isValidPhone(f.phone)) { warn(t("vPhone")); return; }
+    const clash = findDuplicateTeacher({ id: editId, first_name: row.first_name, last_name: row.last_name }, teachers);
+    if (clash) { toast.error(t("dupTitle"), { id: "duplicate", description: t("dupTeacher").replace("{code}", clash.code ?? clash.full_name) }); return; }
     const { error } = editId
       ? await supabase.from("teachers").update(row).eq("id", editId)
       : await supabase.from("teachers").insert(row);
@@ -824,8 +835,11 @@ function LevelsTab() {
 
   async function addLevel(e: React.FormEvent) {
     e.preventDefault();
+    const code = lv.code.trim();
+    const clash = findDuplicateLabel({ id: editId, labels: [code] }, levels, (x) => [x.code]);
+    if (clash) { toast.error(t("dupTitle"), { id: "duplicate", description: t("dupLevel").replace("{name}", clash.code) }); return; }
     const row = {
-      code: lv.code,
+      code,
       price: Number(lv.price),
       package_price: lv.package_price ? Number(lv.package_price) : null,
       sessions: Number(lv.sessions) || 8,

@@ -6,7 +6,9 @@ import { notifyError } from "@/lib/errors";
 import { supabase } from "@/integrations/supabase/client";
 import { useI18n } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
-import { fileToDataUrl, subjectHasActivity, useLevels, useSubjects, type Student } from "@/lib/data";
+import { fileToDataUrl, subjectHasActivity, useLevels, useStudents, useSubjects, type Student } from "@/lib/data";
+import { findDuplicateStudent, hasLetters, isValidPhone } from "@/lib/duplicates";
+import { confirmAction } from "@/lib/confirm";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Field, selectCls } from "@/components/common";
@@ -24,6 +26,7 @@ export function StudentForm({
   const qc = useQueryClient();
   const { data: subjects = [] } = useSubjects();
   const { data: levels = [] } = useLevels();
+  const { data: allStudents = [] } = useStudents();
 
   const [f, setF] = useState({
     first_name: initial?.first_name ?? "",
@@ -145,16 +148,54 @@ export function StudentForm({
 
   async function save(e: React.FormEvent) {
     e.preventDefault();
+    if (busy) return;
+    const first_name = f.first_name.trim().replace(/\s+/g, " ");
+    const last_name = f.last_name.trim().replace(/\s+/g, " ");
+    const problem = !first_name || !last_name
+      ? t("vRequired").replace("{label}", !first_name ? t("firstName") : t("lastName"))
+      : !hasLetters(first_name) || !hasLetters(last_name)
+        ? t("vNameLetters")
+        : !f.age_group
+          ? t("vRequiredChoice").replace("{label}", t("ageGroup"))
+          : !isValidPhone(f.phone) || !isValidPhone(f.parent_phone)
+            ? t("vPhone")
+            : null;
+    if (problem) {
+      toast.warning(t("vTitle"), { id: "form-validation", description: problem });
+      return;
+    }
+
+    // Never register the same student twice
+    const dup = findDuplicateStudent(
+      { id: initial?.id ?? null, first_name, last_name, phone: f.phone, parent_phone: f.parent_phone },
+      allStudents,
+    );
+    if (dup) {
+      const fill = (k: "dupStudentMsg" | "dupStudentPossibleMsg") =>
+        t(k).replace("{name}", `${dup.match.first_name} ${dup.match.last_name}`).replace("{code}", dup.match.code ?? "—");
+      if (dup.kind === "same") {
+        toast.error(t("dupStudentTitle"), { description: fill("dupStudentMsg"), duration: 8000 });
+        return;
+      }
+      const ok = await confirmAction({
+        title: t("dupStudentPossibleTitle"),
+        message: fill("dupStudentPossibleMsg"),
+        confirmLabel: t("dupStudentPossibleOk"),
+        tone: "warning",
+      });
+      if (!ok) return;
+    }
+
     setBusy(true);
     const payload = {
-      first_name: f.first_name,
-      last_name: f.last_name,
+      first_name,
+      last_name,
       gender: f.gender,
       age_group: f.age_group || null,
       photo_url: f.photo_url || null,
-      phone: f.phone || null,
-      parent_phone: f.parent_phone || null,
-      notes: f.notes || null,
+      phone: f.phone.trim() || null,
+      parent_phone: f.parent_phone.trim() || null,
+      notes: f.notes.trim() || null,
     };
     const res = initial
       ? await supabase.from("students").update(payload).eq("id", initial.id).select().single()

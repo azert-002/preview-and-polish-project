@@ -150,7 +150,7 @@ export function WaitlistDialog({
             <Hourglass className="size-4 text-accent" /> {t("addToWaitingList")}
           </DialogTitle>
         </DialogHeader>
-        <form onSubmit={save} className="space-y-4" noValidate>
+        <form onSubmit={save} className="space-y-4">
           <Field label={t("student")}>
             {student ? (
               <div className="flex items-center justify-between gap-2 rounded-lg border bg-secondary px-3 py-2 text-sm">

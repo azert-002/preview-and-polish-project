@@ -412,7 +412,7 @@ export function GroupDialog({
           </DialogTitle>
         </DialogHeader>
 
-        <form onSubmit={save} className="grid gap-3 sm:grid-cols-2" noValidate>
+        <form onSubmit={save} className="grid gap-3 sm:grid-cols-2">
           {/* Group Name: always present, auto-filled in cohort mode, locked initially when adding */}
           <Field label={t("name")} className={isCohort ? "sm:col-span-2" : ""}>
             <div
@@ -567,7 +567,6 @@ export function GroupDialog({
                 <Input
                   type="number"
                   min={0}
-                  required
                   value={f.price}
                   onChange={set("price")}
                   placeholder={String((settings as any)?.workshop_price ?? 500)}

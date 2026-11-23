@@ -1,6 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQueryClient } from "@tanstack/react-query";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { ArrowLeft, Check, X, Undo2, GraduationCap, Hourglass, Printer } from "lucide-react";
 import { toast } from "sonner";
 import { notifyError } from "@/lib/errors";
@@ -37,7 +37,25 @@ function GroupAttendance() {
   const group = groups.find((g) => g.id === id);
   const teacherToday = teacherAttendance.find((a) => a.group_id === id && isToday(a.created_at)) ?? null;
 
+  // A quick double tap must never record the same attendance twice (it would consume two sessions).
+  const pending = useRef(new Set<string>());
+  async function once(key: string, run: () => Promise<void>) {
+    if (pending.current.has(key)) return;
+    pending.current.add(key);
+    try {
+      await run();
+      await qc.invalidateQueries();
+    } finally {
+      pending.current.delete(key);
+    }
+  }
+
   async function markTeacher() {
+    if (!group?.teacher_id || teacherToday) return;
+    await once("teacher", doMarkTeacher);
+  }
+
+  async function doMarkTeacher() {
     if (!group?.teacher_id) return;
     const { error } = await supabase.from("teacher_attendance").insert({ teacher_id: group.teacher_id, group_id: id });
     if (error) { notifyError(error.message); return; }
@@ -62,6 +80,11 @@ function GroupAttendance() {
   }).filter((r) => r.active || r.today || !r.last.withdrawn_at); // removed from the package: seat freed, not listed
 
   async function mark(sid: string, enrollmentId: string, status: "present" | "absent") {
+    if (rows.some((r) => r.sid === sid && r.today)) return;
+    await once(sid, () => doMark(sid, enrollmentId, status));
+  }
+
+  async function doMark(sid: string, enrollmentId: string, status: "present" | "absent") {
     const { error } = await supabase.from("attendance").insert({ enrollment_id: enrollmentId, student_id: sid, group_id: id, status });
     if (error) { error.message.includes("PACKAGE_EXHAUSTED") ? toast.error(t("packageEmpty")) : notifyError(error.message); return; }
     qc.invalidateQueries();
