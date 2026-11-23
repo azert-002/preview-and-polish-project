@@ -345,7 +345,8 @@ export function GroupDialog({
         workshopPrice: createdGroup.price,
       });
 
-      const enrollRows = preset.student_ids.flatMap((studentId) =>
+      // A student waiting twice in the same bucket must still get only one package.
+      const enrollRows = [...new Set(preset.student_ids)].flatMap((studentId) =>
         pkg.blocks.map((block) => ({
           student_id: studentId,
           group_id: createdGroup.id,

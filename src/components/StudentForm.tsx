@@ -42,6 +42,8 @@ export function StudentForm({
     level_id: "",
   });
   const [waitlistId, setWaitlistId] = useState<string | null>(null);
+  // Already placed in a group: editing their details must not put them back on the waiting list.
+  const [enrolled, setEnrolled] = useState(false);
   const [busy, setBusy] = useState(false);
 
   const set = (k: keyof typeof f) => (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) =>
@@ -56,6 +58,7 @@ export function StudentForm({
 
   // Sync initial student info and fetch registration / waitlist / enrollment details when editing
   useEffect(() => {
+    setEnrolled(false);
     if (!initial) {
       setWaitlistId(null);
       setF({
@@ -122,6 +125,7 @@ export function StudentForm({
       if (cancelled) return;
 
       if (enrRows && enrRows.length > 0) {
+        setEnrolled(true);
         const grp = (enrRows[0] as any)?.group;
         if (grp) {
           setF((prev) => ({
@@ -207,7 +211,7 @@ export function StudentForm({
       return;
     }
 
-    if (f.activity && f.subject_id) {
+    if (f.activity && f.subject_id && !(initial && enrolled && !waitlistId)) {
       const waitlistRow = {
         student_id: res.data.id,
         activity: f.activity,
