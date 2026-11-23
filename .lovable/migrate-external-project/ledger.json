@@ -1,0 +1,8 @@
+[
+  {"capability":"code","source":"a.zip (Lovable TanStack project)","outcome":"imported","status":"verified","next_action":"none"},
+  {"capability":"schema","source":"src/lib/local-db (IndexedDB)","outcome":"kept offline in browser","status":"verified","next_action":"move to Lovable Cloud only if the user chooses cloud storage"},
+  {"capability":"records","source":"browser IndexedDB on the user's PC","outcome":"not in archive","status":"pending","next_action":"user exports a JSON backup from Settings on the old PC and restores it here"},
+  {"capability":"auth","source":"local username/password","outcome":"kept","status":"verified","next_action":"none"},
+  {"capability":"authorization","source":"src/lib/permissions.ts + users.ts","outcome":"kept; user management moved to browser","status":"verified","next_action":"none"},
+  {"capability":"external providers / webhooks / schedules","source":"none detected","outcome":"n/a","status":"verified","next_action":"none"}
+]
