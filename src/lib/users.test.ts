@@ -54,4 +54,17 @@ describe("Accounts in the offline database", () => {
     const roles = await getTableRows<{ user_id: string }>("user_roles");
     expect(roles.some((r) => r.user_id === id)).toBe(false);
   });
+
+  it("a deleted admin account is not recreated with admin/admin while another director exists", async () => {
+    await signInDirector();
+    await createUser({ data: { username: "manager", password: "manager-pass", role: "admin" } });
+    await localSupabase.auth.signOut();
+    await localSupabase.auth.signInWithPassword({ email: loginEmail("manager"), password: "manager-pass" });
+    const admin = (await listUsers()).find((u) => u.username === DIRECTOR_USERNAME)!;
+    await deleteUser({ data: { userId: admin.id } });
+    await localSupabase.auth.signOut();
+
+    resetSeededFlag();
+    expect((await signInDirector("admin")).error).not.toBeNull();
+  });
 });

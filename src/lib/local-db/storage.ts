@@ -202,7 +202,10 @@ async function doEnsureSeeded(): Promise<void> {
     }
 
     const users = await getTableRows<LocalUser>("_local_users");
-    const directorExists = users.some((u) => u.username === DIRECTOR_USERNAME);
+    const roles = await getTableRows<{ user_id: string; role: string }>("user_roles");
+    // Seed the built-in director only while the academy has no director at all;
+    // never recreate a deleted "admin" account while another director exists.
+    const directorExists = users.some((u) => u.username === DIRECTOR_USERNAME) || roles.some((r) => r.role === "admin");
     if (!directorExists) {
       // 1. Create Default Director Account
       const directorId = DEFAULT_DIRECTOR_ID;
