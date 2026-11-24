@@ -1,5 +1,7 @@
 # Roadmap
 
+- [ ] إعادة تصميم دورات تحسين المستوى واللغات فقط: مدة زمنية وأسعار الدورات والتجديد، مع تسجيل الحصص فعلياً ودون تغيير دعم المدرسة أو الورشات؛ بانتظار اعتماد المستخدم للملخص قبل التنفيذ.
+
 - [ ] Teacher-only sign-in link tied to admin browser presence, code-based initial credentials and required password change.
 - [ ] Teacher portal with access restricted to the linked teacher's own records; verify isolation and closure.
 
