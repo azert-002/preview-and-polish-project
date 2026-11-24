@@ -1,4 +1,5 @@
 // Pure business rules for Beyond Words (pricing, packages, payroll).
+import { blockActive, isDurationBlock } from "./courses";
 
 export type Activity = "support" | "levels" | "workshop";
 export type Audience = "kids" | "adults";
@@ -33,6 +34,8 @@ export interface PricingSettings {
 export interface PackageBlock {
   sessions: number;
   price: number;
+  /** Duration courses (levels & languages): months this block covers; sessions are then counted, not capped. */
+  months?: number;
 }
 
 export interface PackagePlan {
@@ -69,6 +72,26 @@ export function buildPackage(opts: {
   if (activity === "workshop") {
     const price = Number(opts.workshopPrice ?? 0);
     return { plan: "single", blocks: [{ sessions: 1, price }], total: price };
+  }
+
+  // Level improvement & languages: duration courses, one block per month, sessions counted freely.
+  if (activity === "levels") {
+    const months = (n: number, total: number, kind: PlanKind): PackagePlan => ({
+      plan: kind,
+      blocks: splitAmount(total, n).map((price) => ({ sessions: 0, price, months: 1 })),
+      total,
+    });
+    if (audience === "kids") {
+      return plan === "semester"
+        ? months(6, Number(settings.kids_semester_price ?? 20000) || 20000, "semester")
+        : months(3, Number(settings.kids_quarter_price ?? 12000) || 12000, "quarter");
+    }
+    const monthly = Number(opts.level?.price ?? 0) > 0 ? Number(opts.level?.price) : isA0(opts.level) ? 3000 : 4000;
+    if (!isA0(opts.level) && plan === "four_months") {
+      const full = Number(opts.level?.package_price ?? 0) > 0 ? Number(opts.level?.package_price) : 15000;
+      return months(4, full, "four_months");
+    }
+    return months(1, monthly, "monthly");
   }
 
   // Adults: A0 (3000 / month, 8 sessions), A1/A2/A2+ (4000 / month, or 15000 for 4 months / 30 sessions)
@@ -126,6 +149,11 @@ export function buildPackage(opts: {
   return { plan: "monthly", blocks: [{ sessions: kidsSpm, price }], total: price };
 }
 
+/** A0 is a one-month renewable course; every other adult level runs 4 months. */
+export function isA0(level: { code?: string | null } | null | undefined): boolean {
+  return (level?.code ?? "").trim().toUpperCase() === "A0";
+}
+
 export interface PayrollEnrollment {
   sessions_used: number;
   sessions_total: number;
@@ -146,12 +174,13 @@ export function remainingSessions(e: { sessions_used?: number | null; sessions_t
  */
 export function groupStudentIds(
   activity: string | null | undefined,
-  enrollments: { student_id: string; sessions_used: number; sessions_total: number; withdrawn_at?: string | null }[],
+  enrollments: { id?: string; student_id: string; sessions_used: number; sessions_total: number; withdrawn_at?: string | null; months?: number | null; ends_at?: string | null }[],
+  today?: string,
 ) {
   const list =
     activity === "workshop"
       ? enrollments.filter((e) => !e.withdrawn_at)
-      : enrollments.filter((e) => remainingSessions(e) > 0);
+      : enrollments.filter((e) => blockActive({ id: e.id ?? "", ...e }, today));
   return new Set(list.map((e) => e.student_id));
 }
 
@@ -362,10 +391,11 @@ export function audienceForAgeGroup(g: string | null | undefined): Audience {
  */
 export function groupSeat(
   activity: string | null | undefined,
-  groupEnrollments: { student_id: string; sessions_used: number; sessions_total: number; withdrawn_at?: string | null }[],
+  groupEnrollments: { id?: string; student_id: string; sessions_used: number; sessions_total: number; withdrawn_at?: string | null; months?: number | null; ends_at?: string | null }[],
   studentId: string,
+  today?: string,
 ) {
-  const ids = groupStudentIds(activity, groupEnrollments);
+  const ids = groupStudentIds(activity, groupEnrollments, today);
   const renewal = ids.has(studentId);
   const count = ids.size;
   const full = !renewal && count >= GROUP_CAPACITY;
@@ -457,6 +487,7 @@ export type WithdrawMode = "used" | "full";
 
 export interface WithdrawBlock {
   id: string;
+  months?: number | null;
   sessions_used: number;
   sessions_total: number;
   price: number | string;
@@ -479,6 +510,17 @@ export interface WithdrawalPlan {
  * so their seat in the group is freed. Paid-out or finished blocks are never changed.
  */
 export function planWithdrawal(blocks: WithdrawBlock[], mode: WithdrawMode): WithdrawalPlan {
+  // Levels & languages: the full course price stays owed; every month block is kept and marked withdrawn.
+  if (blocks.length > 0 && blocks.every((b) => isDurationBlock(b))) {
+    const price = Math.round(blocks.reduce((s, b) => s + Number(b.price ?? 0), 0) * 100) / 100;
+    return {
+      keep: blocks.map((b) => ({ id: b.id, sessions_total: Number(b.sessions_total ?? 0), price: Number(b.price ?? 0) })),
+      deletes: [],
+      keepId: null,
+      oldPrice: price,
+      newPrice: price,
+    };
+  }
   const keep: WithdrawalPlan["keep"] = [];
   const deletes: string[] = [];
   let removedPrice = 0;

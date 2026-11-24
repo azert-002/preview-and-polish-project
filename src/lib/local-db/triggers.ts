@@ -8,15 +8,53 @@
 
 import type { DbRow } from "./types";
 import { getTableRows, putTableRow } from "./storage";
+import { algiersDay, isDurationBlock, scheduleBundle, type CourseBlock } from "../courses";
 
+/** Same Algerian calendar day as now (device time zone ignored). */
 function isTodayLocal(isoDate: string): boolean {
-  const d = new Date(isoDate);
-  const now = new Date();
-  return (
-    d.getFullYear() === now.getFullYear() &&
-    d.getMonth() === now.getMonth() &&
-    d.getDate() === now.getDate()
+  return algiersDay(isoDate) === algiersDay();
+}
+
+/** Levels & languages: the first "present" mark starts the course clock for its package. */
+async function startCourseIfNeeded(enrollmentId: string, attendanceAt: string) {
+  const enrollments = await getTableRows<CourseBlock & { id: string }>("enrollments");
+  const enr = enrollments.find((e) => e.id === enrollmentId);
+  if (!enr || !isDurationBlock(enr) || enr.starts_at) return;
+  const bundle = enrollments.filter(
+    (e) => e.student_id === enr.student_id && e.group_id === enr.group_id && e.created_at === enr.created_at,
   );
+  const others = enrollments
+    .filter((e) => e.student_id === enr.student_id && e.group_id === enr.group_id && e.created_at !== enr.created_at && e.ends_at && !e.withdrawn_at)
+    .map((e) => e.ends_at!)
+    .sort();
+  const dates = scheduleBundle(bundle, algiersDay(attendanceAt), others[others.length - 1] ?? null);
+  for (const b of bundle) {
+    const d = dates.get(b.id);
+    if (d) await putTableRow("enrollments", { ...(b as unknown as DbRow), ...d });
+  }
+}
+
+/** Undoing a mark gives the session back; undoing the only presence of a course resets its start. */
+export async function handleAttendanceDelete(row: DbRow): Promise<void> {
+  const enrollmentId = row.enrollment_id as string;
+  const enrollments = await getTableRows<CourseBlock & { id: string }>("enrollments");
+  const enr = enrollments.find((e) => e.id === enrollmentId);
+  if (!enr) return;
+  if (row.counted) {
+    enr.sessions_used = Math.max(Number(enr.sessions_used ?? 0) - 1, 0);
+    await putTableRow("enrollments", enr as unknown as DbRow);
+  }
+  if (!isDurationBlock(enr) || !enr.starts_at || row.status !== "present") return;
+  const bundle = enrollments.filter(
+    (e) => e.student_id === enr.student_id && e.group_id === enr.group_id && e.created_at === enr.created_at,
+  );
+  const ids = new Set(bundle.map((b) => b.id));
+  const attendance = await getTableRows<{ id: string; enrollment_id: string; status: string }>("attendance");
+  const stillPresent = attendance.some((a) => a.id !== row.id && ids.has(a.enrollment_id) && a.status === "present");
+  if (stillPresent || bundle.some((b) => b.payout_id)) return;
+  for (const b of bundle) {
+    await putTableRow("enrollments", { ...(b as unknown as DbRow), starts_at: null, ends_at: null });
+  }
 }
 
 export async function handleAttendanceInsert(
@@ -48,6 +86,10 @@ export async function handleAttendanceInsert(
         sessions_used: (enr.sessions_used || 0) + 1,
       });
     }
+  }
+
+  if (enrollmentId && attendanceRow.status === "present") {
+    await startCourseIfNeeded(enrollmentId, attendanceRow.created_at as string);
   }
 
   return attendanceRow;

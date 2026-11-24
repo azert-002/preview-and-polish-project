@@ -14,6 +14,7 @@ import {
   handleTeacherAttendanceInsert,
   handleEnrollmentInsert,
   handleStudentDelete,
+  handleAttendanceDelete,
 } from "./triggers";
 import type { QueryFilter, QueryOrder, TableName } from "./types";
 import { getRandomHex } from "./crypto";
@@ -368,6 +369,9 @@ export class LocalQueryBuilder<T = any> {
       for (const r of matched) {
         if (this.tableName === "students" && r.id) {
           await handleStudentDelete(r.id as string);
+        }
+        if (this.tableName === "attendance") {
+          await handleAttendanceDelete(r);
         }
         await deleteTableRow(this.tableName, r.id as string | number);
       }

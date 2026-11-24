@@ -147,6 +147,9 @@ CREATE TABLE IF NOT EXISTS enrollments (
   sessions_used INTEGER NOT NULL DEFAULT 0,
   payout_id TEXT REFERENCES payouts(id) ON DELETE SET NULL,
   withdrawn_at TEXT,
+  months INTEGER NOT NULL DEFAULT 0, -- >0: levels/languages month block (sessions counted, not capped)
+  starts_at TEXT, -- set on the first presence (Algiers day)
+  ends_at TEXT,
   created_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
 

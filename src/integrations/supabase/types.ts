@@ -87,6 +87,9 @@ export type Database = {
       enrollments: {
         Row: {
           created_at: string
+          ends_at: string | null
+          months: number
+          starts_at: string | null
           group_id: string
           id: string
           payout_id: string | null
@@ -99,6 +102,9 @@ export type Database = {
         }
         Insert: {
           created_at?: string
+          ends_at?: string | null
+          months?: number
+          starts_at?: string | null
           group_id: string
           id?: string
           payout_id?: string | null
@@ -111,6 +117,9 @@ export type Database = {
         }
         Update: {
           created_at?: string
+          ends_at?: string | null
+          months?: number
+          starts_at?: string | null
           group_id?: string
           id?: string
           payout_id?: string | null
